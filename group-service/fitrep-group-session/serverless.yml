@@ -1,0 +1,135 @@
+# Welcome to Serverless!
+#
+# This file is the main config file for your service.
+# It's very minimal at this point and uses default values.
+# You can always add more config options for more control.
+# We've included some commented out config examples here.
+# Just uncomment any of them to get that config option.
+#
+# For full config options, check the docs:
+#    docs.serverless.com
+#
+# Happy Coding!
+
+service: fitrep-simplified-group-session
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-2'}
+  role: ${ssm:/${self:provider.stage}/global/iam/${self:provider.custom.SERVICE_VERSION}/${self:service}}
+  memorySize: 1024
+  endpointType: REGIONAL
+  timeout: 240
+  logRetentionInDays: 60
+
+  environment:
+    AWS_DynamoDB_Session_Table: ${ssm:/${self:provider.stage}/global/${self:provider.custom.SERVICE_VERSION}/SESSION_TABLE}
+    AWS_DynamoDB_GSI_INDEX_AllSessionsStartTime: AllSessionsStartTime-index
+    AWS_DynamoDB_GSI_INDEX_GroupSessionFee: GroupSessionFee-index
+    GROUP_SESSION_TABLE: fitrep-group-sessions-${self:provider.stage}
+    USER_TABLE: ${ssm:/${self:provider.stage}/global/USER_TABLE}
+    AWS_SNS_ARN: ${ssm:/${self:provider.stage}/global/${self:provider.custom.SERVICE_VERSION}/BOOKING_SNS_TOPIC}
+    STRIPE_CHARGE_URL: ${ssm:/${self:provider.stage}/global/STRIPE_CHARGE_URL}
+    BACKOFFICE_SSM_PARAMETER: /${self:provider.stage}/global/${self:provider.custom.SERVICE_VERSION}/BACKOFFICE
+  custom:
+    SERVICE_VERSION: v1
+    COGNITO_POOL_ARN: ${ssm:/${self:provider.stage}/global/COGNITO_USER_POOL_ARN}
+
+package:
+  include:
+    - fitrep-modules/**
+    - helpers/**
+
+functions:
+  createGroupSession:
+    handler: group.create
+    events:
+      - http:
+          path: group/create
+          method: post
+          cors: true
+
+  reserveGroupSession:
+    handler: group.reserve
+    events:
+      - http:
+          path: group/reserve
+          method: post
+          authorizer:
+            arn: ${self:provider.custom.COGNITO_POOL_ARN}
+
+  listGroupSession:
+    handler: group.list
+    events:
+      - http:
+          path: group/list
+          method: get
+          authorizer:
+            arn: ${self:provider.custom.COGNITO_POOL_ARN}
+
+  getGroupSession:
+    handler: group.get
+    events:
+      - http:
+          path: group/get
+          method: get
+          authorizer:
+            arn: ${self:provider.custom.COGNITO_POOL_ARN}
+          reqValidatorName: 'xMyRequestValidator'
+          request:
+            parameters:
+              querystrings:
+                id: true
+
+resources:
+  Resources:
+    xMyRequestValidator:  
+      Type: "AWS::ApiGateway::RequestValidator"
+      Properties:
+        Name: "FitRepGroupTrainingRequestValidator"
+        RestApiId: 
+          Ref: ApiGatewayRestApi
+        ValidateRequestParameters: true
+
+    fitrepGroupSessionTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.GROUP_SESSION_TABLE}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: startTime
+            AttributeType: N
+          - AttributeName: fee
+            AttributeType: N
+          - AttributeName: tempSelectAll
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 10
+          WriteCapacityUnits: 10
+        GlobalSecondaryIndexes:
+          - IndexName: ${self:provider.environment.AWS_DynamoDB_GSI_INDEX_AllSessionsStartTime}
+            KeySchema:
+              - AttributeName: tempSelectAll
+                KeyType: HASH
+              - AttributeName: startTime
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 10
+              WriteCapacityUnits: 10
+          - IndexName: ${self:provider.environment.AWS_DynamoDB_GSI_INDEX_GroupSessionFee}
+            KeySchema:
+              - AttributeName: fee
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 10
+              WriteCapacityUnits: 10

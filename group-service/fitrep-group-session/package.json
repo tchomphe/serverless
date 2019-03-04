@@ -1,0 +1,25 @@
+{
+  "name": "fitrep-be-simplified-group-session-service",
+  "version": "1.0.0",
+  "description": "",
+  "main": "handler.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://tchomphel@bitbucket.org/fitnessrepublic/fitrep-be-simplified-group-session-service.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "homepage": "https://bitbucket.org/fitnessrepublic/fitrep-be-simplified-group-session-service#readme",
+  "dependencies": {
+    "ajv": "^6.6.2",
+    "aws-sdk": "^2.378.0",
+    "axios": "^0.18.0",
+    "is-empty": "^1.2.0",
+    "moment-timezone": "^0.5.23",
+    "randomstring": "^1.1.5",
+    "uuid": "^3.3.2"
+  }
+}
